@@ -90,15 +90,35 @@ export default function Home() {
   const handleDownload = async () => {
     const filtered = results.filter((_, i) => selected[i]);
     if (filtered.length === 0) return alert("少なくとも1つ選んでください");
-
+  
     try {
-      const res = await fetch('http://localhost:8000/generate_excel', {
+      // ✅ 第一步：请求生成 Excel
+      const res = await fetch('https://invoice-backend.agentify.jp/generate_excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(filtered.map(r => r.result))
       });
+  
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ Excel生成失敗", res.status, errorText);
+        return alert("Excelの生成に失敗しました。サーバーエラーです。");
+      }
+  
       const { download_url } = await res.json();
-      const excelRes = await fetch('http://localhost:8000' + download_url);
+      if (!download_url) {
+        console.error("❌ download_url が返されませんでした");
+        return alert("Excelの生成に失敗しました（download_urlが取得できません）。");
+      }
+  
+      // ✅ 第二步：下载 Excel 文件
+      const excelRes = await fetch(`https://invoice-backend.agentify.jp${download_url}`);
+      if (!excelRes.ok) {
+        const errorText = await excelRes.text();
+        console.error("❌ Excelダウンロード失敗", excelRes.status, errorText);
+        return alert("Excelファイルのダウンロードに失敗しました。");
+      }
+  
       const blob = await excelRes.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -109,7 +129,7 @@ export default function Home() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("❌ ダウンロード失敗", err);
+      console.error("❌ 例外エラーが発生しました", err);
       alert("Excelの生成またはダウンロードに失敗しました。");
     }
   };
